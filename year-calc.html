@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ASTROFIZZZ YEAR CALCULATOR</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #d1d5db;
+      --accent: #2563eb;
+      --error: #dc2626;
+      --shadow: 0 12px 30px rgba(0,0,0,0.08);
+    }
+    body.dark {
+      --bg: #0f172a;
+      --panel: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --border: #334155;
+      --accent: #60a5fa;
+      --error: #f87171;
+      --shadow: 0 12px 30px rgba(0,0,0,0.35);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+    }
+    .app {
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.4rem, 2vw, 2rem);
+      letter-spacing: 0.02em;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    select, input {
+      font: inherit;
+      color: var(--text);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      outline: none;
+    }
+    select:focus, input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+    }
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      user-select: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+    }
+    .main {
+      flex: 1;
+      display: grid;
+      place-items: center;
+    }
+    .card {
+      width: min(820px, 100%);
+      min-height: min(520px, calc(100vh - 160px));
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 18px;
+    }
+    .fieldrow {
+      display: grid;
+      gap: 10px;
+    }
+    label { color: var(--muted); font-size: 0.95rem; }
+    input[type="number"] { width: 100%; font-size: 1.1rem; }
+    .result {
+      margin-top: 8px;
+      font-size: clamp(2rem, 5vw, 4.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      min-height: 1.2em;
+    }
+    .message {
+      color: var(--error);
+      font-size: 1rem;
+      min-height: 1.2em;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <h1>ASTROFIZZZ YEAR CALCULATOR</h1>
+      <div class="controls">
+        <label class="toggle">
+          <input id="modeToggle" type="checkbox" />
+          Dark mode
+        </label>
+        <select id="roundingSelect" aria-label="Rounding precision">
+          <option value="1">Nearest whole number</option>
+          <option value="10">Nearest tens place</option>
+          <option value="100">Nearest hundreds place</option>
+          <option value="1000">Nearest thousands place</option>
+        </select>
+      </div>
+    </div>
+    <div class="main">
+      <div class="card">
+        <div class="fieldrow">
+          <label for="yearInput">Year value (BC values are negative)</label>
+          <input id="yearInput" type="number" inputmode="numeric" step="1" placeholder="Enter a number" />
+          <div class="hint">Press Enter to calculate.</div>
+        </div>
+        <div id="result" class="result">PH:</div>
+        <div id="message" class="message"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const yearInput = document.getElementById('yearInput');
+    const result = document.getElementById('result');
+    const message = document.getElementById('message');
+    const roundingSelect = document.getElementById('roundingSelect');
+    const modeToggle = document.getElementById('modeToggle');
+
+    let currentValid = false;
+    let currentN = null;
+
+    function roundTo(value, place) {
+      return Math.round(value / place) * place;
+    }
+
+    // Uses only |(-x/4) + 476|
+    function computeValue(n) {
+      const base = Math.abs((-n / 4) + 476);
+      const label = n < 1904 ? 'PH' : 'RH';
+      return { label, value: base };
+    }
+
+    function displayValue(label, value) {
+      result.textContent = label + ': ' + value;
+      message.textContent = '';
+    }
+
+    function showError() {
+      result.textContent = 'PH:';
+      // Updated message text per request
+      message.textContent = 'Enter a valid year';
+      currentValid = false;
+      currentN = null;
+    }
+
+    function calculateAndDisplay() {
+      const raw = yearInput.value.trim();
+      const n = Number(raw);
+      // Added 'n === 0' check to trigger error on 0
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n === 0) {
+        showError();
+        return;
+      }
+      const computed = computeValue(n);
+      const rounded = roundTo(computed.value, Number(roundingSelect.value));
+      currentValid = true;
+      currentN = n;
+      displayValue(computed.label, rounded);
+    }
+
+    yearInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        calculateAndDisplay();
+      }
+    });
+
+    roundingSelect.addEventListener('change', () => {
+      if (currentValid && currentN !== null) {
+        calculateAndDisplay();
+      }
+    });
+
+    modeToggle.addEventListener('change', () => {
+      document.body.classList.toggle('dark', modeToggle.checked);
+    });
+  </script>
+</body>
+</html>
